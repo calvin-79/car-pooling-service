@@ -1,68 +1,98 @@
-# Carbon Credit Exchange Sui Module
+# Car Pooling Smart Contract
 
-This module implements a carbon credit trading platform on the Sui blockchain. It allows users to register carbon credits, list them for sale, place bids on listings, and accept bids to transfer ownership.
+## Overview
 
-**Key Features:**
+This repository contains a Move-based smart contract for a decentralized car pooling service. The car pooling system allows users to register as passengers or drivers, create trips, join trips, and handle payments securely on the blockchain. The contract is designed to ensure trust and automation between the parties involved in car pooling, with features such as trip management, fare collection, and withdrawals for both passengers and the car pooling service management.
 
-* **Carbon Credit Registration:** Users can register new carbon credits with unique identifiers, quantities, and metadata.
-* **Listing Management:** Owners can list their carbon credits for sale, setting a base price and activating/deactivating listings.
-* **Bidding System:** Users can place bids on active listings, specifying the amount of SUI tokens they are willing to pay.
-* **Bid Acceptance:** Listing owners can accept bids, transferring ownership of the carbon credit and receiving the bid amount.
-* **Bid Withdrawal:** Bidders can withdraw their bids if they haven't been accepted.
+## Features
 
-**Data Structures:**
+- **Passenger Registration**: Users can register as passengers and deposit funds into their accounts.
+- **Trip Creation**: Drivers can create new trips, specifying the destination and fare.
+- **Trip Joining**: Passengers can join available trips and pay the fare.
+- **Service Fees**: The car pooling service can charge a fee for managing trips.
+- **Secure Payments**: Funds are held in a pool until the trip is completed, after which they are transferred to the driver.
+- **Balance Management**: Passengers and service management can deposit or withdraw funds as needed.
 
-* **Contract:** Represents the overall carbon credit exchange contract with:
-  * `id`: Unique identifier for the contract.
-  * `bids`: Vector of all bids placed on the platform.
-  * `listings`: Vector of all active carbon credit listings.
-  * `escrow`: Balance of SUI tokens held in escrow for bids.
-* **CarbonCredit:** Represents a carbon credit with:
-  * `id`: Unique identifier for the carbon credit.
-  * `owner`: Address of the current owner.
-  * `quantity`: Number of carbon credits.
-  * `metadata`: Additional information about the carbon credit.
-* **Listing:** Represents a listed carbon credit for sale with:
-  * `id`: Unique identifier for the listing.
-  * `credit_id`: ID of the carbon credit being listed.
-  * `owner`: Address of the listing owner.
-  * `base_price`: Minimum price for the carbon credit.
-  * `active`: Status of the listing (active or inactive).
-* **Bid:** Represents a bid on a carbon credit with:
-  * `id`: Unique identifier for the bid.
-  * `credit_id`: ID of the carbon credit being bid on.
-  * `bidder`: Address of the bidder.
-  * `amount`: Amount of SUI tokens offered in the bid.
-  * `is_claimed`: Whether the bid amount has been claimed.
+## Smart Contract Structure
 
-**Error Codes:**
+### 1. `ServiceCap`
 
-* `ENotOwner (0)`: Indicates the caller is not authorized to perform the action on the specified object (e.g., listing, bid).
-* `EInactiveListing (2)`: Indicates the attempted action involves an inactive listing.
-* `EInsufficientBid (3)`: Indicates the bid amount is less than the base price of the listing.
-* `EInvalidBid (4)`: Indicates the bid is associated with a different carbon credit.
-* `EClaimedBid (5)`: Indicates the bid amount has already been claimed.
-* `ENoListings (6)`: Indicates there are no active listings on the contract.
+This struct represents the car pooling service and manages the following:
 
-**Functions:**
+- A list of all active trips.
+- The service's wallet containing collected fees.
+- The service fee rate.
+- The management's address.
 
-* **init (ctx: &mut TxContext):** Initializes a new carbon credit exchange contract.
-* **register_carbon_credit (owner: address, quantity: u64, metadata: String, ctx: &mut TxContext): CarbonCredit:** Registers a new carbon credit and returns its details.
-* **list_carbon_credit (contract: &mut Contract, credit: &mut CarbonCredit, base_price: u64, ctx: &mut TxContext):** Lists a carbon credit for sale on the contract.
-* **deactivate_listing (listing: &mut Listing, ctx: &mut TxContext):** Deactivates a listed carbon credit.
-* **get_listings (contract: &Contract): vector<ID>:** Returns a vector of IDs for all active listings on the contract.
-* **place_bid (contract: &mut Contract, listing: &Listing, amount: Coin<SUI>, ctx: &mut TxContext):** Places a bid on an active listing.
-* **accept_bid (contract: &mut Contract, listing: &mut Listing, bid: &mut Bid, credit: &mut CarbonCredit, ctx: &mut TxContext):** Accepts a bid, transferring ownership of the carbon credit and receiving the bid amount.
-* **withdraw_bid (contract: &mut Contract, bid: &mut Bid, ctx: &mut TxContext):** Allows a bidder to withdraw their bid if it hasn't been accepted.
+### 2. `Trip`
 
-**Additional Notes:**
+Represents an individual car pooling trip:
 
-* This module utilizes Sui Move concepts like objects, vectors, and balances.
-* The code includes error handling and access control mechanisms.
-* For further details and usage examples, refer to the specific implementation within the `car_pooling` module.
+- Tracks passengers and driver.
+- Stores destination and fare.
+- Holds the pool of funds collected for the trip.
+- Indicates whether the trip has been completed.
 
-**Dependencies:**
+### 3. `Passenger`
 
-* This module requires the `sui` and `candid` crates for Sui blockchain interaction and data serialization.
+Represents a passenger in the system:
 
-get more info at [dacade](https://dacade.org/communities/sui/challenges/19885730-fb83-477a-b95b-4ab265b61438/learning-modules/fc2e67a1-520d-4fae-a318-38414babc803)
+- Tracks the passenger's address and their balance of deposited funds.
+
+### Error Codes
+
+- `ENotOwner`: Unauthorized access by someone other than the service management.
+- `ENotPassenger`: Action attempted by someone who is not a registered passenger.
+- `EInsufficientBalance`: When a passenger or service wallet does not have enough balance.
+- `ETripCompleted`: Attempt to interact with a trip that has already been completed.
+
+## Functions
+
+### Initialization
+
+- **`init(ctx: &mut TxContext)`**: Initializes the car pooling service. It creates a `ServiceCap` object that manages trips and collects service fees.
+
+### Service Management
+
+- **`set_service_fee(service: &mut ServiceCap, fee: u64, ctx: &mut TxContext)`**: Allows the service management to set or change the service fee.
+- **`withdraw_wallet(service: &mut ServiceCap, amount: u64, ctx: &mut TxContext)`**: Withdraws funds from the service wallet by the management.
+
+### Passenger Operations
+
+- **`add_passenger(passenger: address, ctx: &mut TxContext)`**: Registers a new passenger with an initial balance of zero.
+- **`deposit(passenger: &mut Passenger, amount: Coin<SUI>)`**: Deposits funds into the passenger's balance.
+- **`withdraw(passenger: &mut Passenger, amount: u64, ctx: &mut TxContext)`**: Allows a passenger to withdraw funds from their balance.
+
+### Trip Operations
+
+- **`create_trip(service: &mut ServiceCap, driver: address, destination: String, fare: u64, ctx: &mut TxContext)`**: Creates a new trip managed by the service with a driver, destination, and fare.
+- **`join_trip(trip: &mut Trip, passenger: &mut Passenger, ctx: &mut TxContext)`**: Allows a passenger to join a trip if they have sufficient balance to cover the fare.
+- **`complete_trip(trip: &mut Trip, ctx: &mut TxContext)`**: Completes the trip and transfers the funds in the trip pool to the driver.
+
+### Viewing Trips
+
+- **`view_trips(service: &ServiceCap)`**: Returns a list of all active trips.
+
+## Error Handling
+
+The contract uses assertions to ensure safe execution. If any condition fails (e.g., insufficient balance, unauthorized access), the corresponding error code will be thrown, ensuring no unintended operations can occur.
+
+## How to Deploy
+
+1. Install the necessary tools for working with Move smart contracts.
+2. Build the contract and deploy it to a SUI-based blockchain environment.
+3. Interact with the smart contract by invoking the relevant functions for passenger registration, trip creation, and joining trips.
+
+## Future Enhancements
+
+- **Reputation System**: Introduce a reputation system for drivers and passengers based on completed trips.
+- **Dynamic Pricing**: Implement dynamic fare adjustments based on demand and distance.
+- **Cancellation Policy**: Add support for trip cancellation and refunds for passengers.
+  
+## License
+
+This project is open-source and available under the MIT License.
+
+---
+
+Feel free to explore the codebase and customize it for your specific needs!
