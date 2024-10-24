@@ -51,16 +51,18 @@ module car_pooling::car_pooling {
             management: tx_context::sender(ctx),
             service_fee: 0,
         };
+
         transfer::transfer(service, tx_context::sender(ctx));
     }
 
-    // set service fee
+    // Sets the service fee for the car pooling service.
     public fun set_service_fee(
-        service: &mut ServiceCap,
-        fee: u64,
-        ctx: &mut TxContext
+        service: &mut ServiceCap, // ServiceCap struct reference
+        fee: u64, // Service fee
+        ctx: &mut TxContext // Transaction context 
     ) {
-        assert!(tx_context::sender(ctx) == service.management, ENotOwner); // Add access control check
+        // Ensure only the service management can set the service fee.
+        assert!(tx_context::sender(ctx) == service.management, ENotOwner); 
         service.service_fee = fee;
     }
 
@@ -95,7 +97,9 @@ module car_pooling::car_pooling {
         ctx: &mut TxContext
     ) {
         let id = object::new(ctx);
+
         let inner = object::uid_to_inner(&id);
+
         let trip = Trip {
             id,
             passengers: vector::empty(),
@@ -135,6 +139,7 @@ module car_pooling::car_pooling {
         trip: &mut Trip,
         ctx: &mut TxContext
     ) {
+        assert!(tx_context::sender(ctx) == trip.driver, ENotOwner); // Only the driver can complete the trip
         assert!(!trip.completed, ETripCompleted);
         
         let payment = balance::withdraw_all(&mut trip.pool);
