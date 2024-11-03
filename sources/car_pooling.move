@@ -108,10 +108,10 @@ module car_pooling::car_pooling {
         fare: u64,
         ctx: &mut TxContext
     ) {
+        // Ensure the driver is a registered passenger
+        assert!(is_registered_passenger(service, driver), ENotPassenger);
+        
         let id = object::new(ctx);
-
-        let inner = object::uid_to_inner(&id);
-
         let trip = Trip {
             id,
             passengers: vector::empty(),
@@ -122,7 +122,7 @@ module car_pooling::car_pooling {
             pool: balance::zero<SUI>(),
         };
         transfer::share_object(trip);
-        vector::push_back(&mut service.trips, inner);
+        vector::push_back(&mut service.trips, object::uid_to_inner(&id));
     }
 
     // Allows a passenger to view trips
@@ -140,9 +140,13 @@ module car_pooling::car_pooling {
     ) {
         check_balance(&passenger.balance, trip.fare, EInsufficientBalance);
         
+        // Check if the passenger is already in the trip
+        for p in trip.passengers {
+            assert!(p != passenger.passenger, ENotPassenger); // Prevent duplicate entries
+        }
+
         let fare = coin::take(&mut passenger.balance, trip.fare, ctx);
         coin::put(&mut trip.pool, fare);
-
         vector::push_back(&mut trip.passengers, passenger.passenger);
     }
 
@@ -165,7 +169,7 @@ module car_pooling::car_pooling {
         amount: u64,
         ctx: &mut TxContext
     ) {
-        assert!(tx_context::sender(ctx) == passenger.passenger, ENotPassenger); // Add access control check
+        assert!(tx_context::sender(ctx) == passenger.passenger, ENotPassenger); // Access control check
         check_balance(&passenger.balance, amount, EInsufficientBalance);
         let withdrawn = coin::take(&mut passenger.balance, amount, ctx);
         transfer::public_transfer(withdrawn, passenger.passenger);
@@ -177,9 +181,23 @@ module car_pooling::car_pooling {
         amount: u64,
         ctx: &mut TxContext
     ) {
-        assert!(tx_context::sender(ctx) == service.management, ENotOwner); // Add access control check
+        assert!(tx_context::sender(ctx) == service.management, ENotOwner); // Access control check
         check_balance(&service.wallet, amount, EInsufficientBalance);
         let withdrawn = coin::take(&mut service.wallet, amount, ctx);
         transfer::public_transfer(withdrawn, service.management);
+    }
+
+    // Helper function to check if a driver is a registered passenger
+    fun is_registered_passenger(service: &ServiceCap, driver: address): bool {
+        for p in service.trips {
+            // Logic to check if the driver exists in the passenger list for any trip
+            let trip = object::get::<Trip>(p); // Assuming object::get retrieves the trip object
+            for pass in trip.passengers {
+                if pass == driver {
+                    return true;
+                }
+            }
+        }
+        false // Return false if not found
     }
 }
