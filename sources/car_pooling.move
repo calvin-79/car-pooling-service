@@ -3,6 +3,7 @@ module car_pooling::car_pooling {
 
     // Importing necessary modules from the standard library and SUI.
     use sui::sui::SUI;
+    use sui::object;
     use std::string::String;
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};
@@ -154,9 +155,10 @@ module car_pooling::car_pooling {
     // Completes a trip.
     public fun complete_trip(
         trip: &mut Trip,
+        cap: &TripCap,
         ctx: &mut TxContext
     ) {
-        assert!(tx_context::sender(ctx) == trip.driver, ENotOwner); // Only the driver can complete the trip
+        assert!(object::id(trip) == cap.`for`, EInsufficientBalance);
         assert!(!trip.completed, ETripCompleted); // Ensure the trip is not already completed
         
         withdraw_and_transfer(&mut trip.pool, trip.driver, ctx);
