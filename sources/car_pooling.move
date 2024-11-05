@@ -75,10 +75,7 @@ module car_pooling::car_pooling {
     public fun set_service_fee(
         service: &mut ServiceCap, // ServiceCap struct reference
         fee: u64, // Service fee
-        ctx: &mut TxContext // Transaction context 
     ) {
-        // Ensure only the service management can set the service fee.
-        assert!(tx_context::sender(ctx) == service.management, ENotOwner); 
         service.service_fee = fee;
     }
 
