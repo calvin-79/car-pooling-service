@@ -3,10 +3,10 @@ module car_pooling::car_pooling {
 
     // Importing necessary modules from the standard library and SUI.
     use sui::sui::SUI;
-    use sui::object;
     use std::string::String;
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};
+    use sui::table::{Self, Table};
 
     // Structs definition for the car pooling system
 
@@ -22,7 +22,7 @@ module car_pooling::car_pooling {
     // Struct to represent a trip.
     public struct Trip has key, store {
         id: UID,
-        passengers: vector<address>, // Vector to store the addresses of passengers in the trip.
+        passengers: Table<address, bool>, // Vector to store the addresses of passengers in the trip.
         driver: address, // Address of the driver of the trip.
         destination: String, // Destination of the trip.
         fare: u64, // Fare for the trip.
@@ -114,7 +114,7 @@ module car_pooling::car_pooling {
 
         let trip = Trip {
             id,
-            passengers: vector::empty(),
+            passengers: table::new(ctx),
             driver,
             destination,
             fare,
@@ -147,7 +147,8 @@ module car_pooling::car_pooling {
         let fare = coin::take(&mut passenger.balance, trip.fare, ctx);
         coin::put(&mut trip.pool, fare);
 
-        vector::push_back(&mut trip.passengers, passenger.passenger);
+        // add to table, There is no need to check if it is already exist. it will be revert from dynamic field module 
+        trip.passengers.add(ctx.sender(), true);
     }
 
     // Completes a trip.
