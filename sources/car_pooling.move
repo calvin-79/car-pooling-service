@@ -100,8 +100,7 @@ module car_pooling::car_pooling {
         passenger: &mut Passenger,
         amount: Coin<SUI>,
     ) {
-        let coin = coin::into_balance(amount);
-        balance::join(&mut passenger.balance, coin);
+        coin::put(&mut passenger.balance, amount);
     }
 
     // Creates a new trip.
