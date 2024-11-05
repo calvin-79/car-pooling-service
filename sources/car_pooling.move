@@ -144,8 +144,6 @@ module car_pooling::car_pooling {
         passenger: &mut Passenger,
         ctx: &mut TxContext
     ) {
-        check_balance(&passenger.balance, trip.fare, EInsufficientBalance);
-        
         let fare = coin::take(&mut passenger.balance, trip.fare, ctx);
         coin::put(&mut trip.pool, fare);
 
