@@ -29,6 +29,11 @@ module car_pooling::car_pooling {
         pool: Balance<SUI>, // Balance representing the total funds collected in the trip pool.
     }
 
+    public struct TripCap has key {
+        id: UID,
+        `for`: ID
+    }
+
     // Struct to represent a passenger in a trip.
     public struct Passenger has key, store {
         id: UID,
@@ -63,7 +68,6 @@ module car_pooling::car_pooling {
             management: tx_context::sender(ctx),
             service_fee: 0,
         };
-
         transfer::transfer(service, tx_context::sender(ctx));
     }
 
@@ -109,7 +113,6 @@ module car_pooling::car_pooling {
         ctx: &mut TxContext
     ) {
         let id = object::new(ctx);
-
         let inner = object::uid_to_inner(&id);
 
         let trip = Trip {
@@ -121,7 +124,13 @@ module car_pooling::car_pooling {
             completed: false,
             pool: balance::zero<SUI>(),
         };
+
+        let cap = TripCap {
+            id: object::new(ctx),
+            `for`: inner
+        };
         transfer::share_object(trip);
+        transfer::transfer(cap, ctx.sender());
         vector::push_back(&mut service.trips, inner);
     }
 
