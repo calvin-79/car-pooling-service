@@ -164,11 +164,9 @@ module car_pooling::car_pooling {
         passenger: &mut Passenger,
         amount: u64,
         ctx: &mut TxContext
-    ) {
-        assert!(tx_context::sender(ctx) == passenger.passenger, ENotPassenger); // Add access control check
-        check_balance(&passenger.balance, amount, EInsufficientBalance);
-        let withdrawn = coin::take(&mut passenger.balance, amount, ctx);
-        transfer::public_transfer(withdrawn, passenger.passenger);
+    ) : Coin<SUI> {
+        coin::take(&mut passenger.balance, amount, ctx)
+
     }
 
     // Withdraws funds from the service's wallet.
