@@ -6,6 +6,7 @@ module car_pooling::car_pooling {
     use std::string::String;
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};
+    use sui::table::{Self, Table};
 
     // Structs definition for the car pooling system
 
@@ -21,12 +22,17 @@ module car_pooling::car_pooling {
     // Struct to represent a trip.
     public struct Trip has key, store {
         id: UID,
-        passengers: vector<address>, // Vector to store the addresses of passengers in the trip.
+        passengers: Table<address, bool>, // Vector to store the addresses of passengers in the trip.
         driver: address, // Address of the driver of the trip.
         destination: String, // Destination of the trip.
         fare: u64, // Fare for the trip.
         completed: bool, // Status indicating if the trip is completed.
         pool: Balance<SUI>, // Balance representing the total funds collected in the trip pool.
+    }
+
+    public struct TripCap has key {
+        id: UID,
+        `for`: ID
     }
 
     // Struct to represent a passenger in a trip.
@@ -63,7 +69,6 @@ module car_pooling::car_pooling {
             management: tx_context::sender(ctx),
             service_fee: 0,
         };
-
         transfer::transfer(service, tx_context::sender(ctx));
     }
 
@@ -71,10 +76,7 @@ module car_pooling::car_pooling {
     public fun set_service_fee(
         service: &mut ServiceCap, // ServiceCap struct reference
         fee: u64, // Service fee
-        ctx: &mut TxContext // Transaction context 
     ) {
-        // Ensure only the service management can set the service fee.
-        assert!(tx_context::sender(ctx) == service.management, ENotOwner); 
         service.service_fee = fee;
     }
 
@@ -96,8 +98,7 @@ module car_pooling::car_pooling {
         passenger: &mut Passenger,
         amount: Coin<SUI>,
     ) {
-        let coin = coin::into_balance(amount);
-        balance::join(&mut passenger.balance, coin);
+        coin::put(&mut passenger.balance, amount);
     }
 
     // Creates a new trip.
@@ -109,19 +110,24 @@ module car_pooling::car_pooling {
         ctx: &mut TxContext
     ) {
         let id = object::new(ctx);
-
         let inner = object::uid_to_inner(&id);
 
         let trip = Trip {
             id,
-            passengers: vector::empty(),
+            passengers: table::new(ctx),
             driver,
             destination,
             fare,
             completed: false,
             pool: balance::zero<SUI>(),
         };
+
+        let cap = TripCap {
+            id: object::new(ctx),
+            `for`: inner
+        };
         transfer::share_object(trip);
+        transfer::transfer(cap, ctx.sender());
         vector::push_back(&mut service.trips, inner);
     }
 
@@ -138,20 +144,20 @@ module car_pooling::car_pooling {
         passenger: &mut Passenger,
         ctx: &mut TxContext
     ) {
-        check_balance(&passenger.balance, trip.fare, EInsufficientBalance);
-        
         let fare = coin::take(&mut passenger.balance, trip.fare, ctx);
         coin::put(&mut trip.pool, fare);
 
-        vector::push_back(&mut trip.passengers, passenger.passenger);
+        // add to table, There is no need to check if it is already exist. it will be revert from dynamic field module 
+        trip.passengers.add(ctx.sender(), true);
     }
 
     // Completes a trip.
     public fun complete_trip(
         trip: &mut Trip,
+        cap: &TripCap,
         ctx: &mut TxContext
     ) {
-        assert!(tx_context::sender(ctx) == trip.driver, ENotOwner); // Only the driver can complete the trip
+        assert!(object::id(trip) == cap.`for`, EInsufficientBalance);
         assert!(!trip.completed, ETripCompleted); // Ensure the trip is not already completed
         
         withdraw_and_transfer(&mut trip.pool, trip.driver, ctx);
@@ -164,11 +170,9 @@ module car_pooling::car_pooling {
         passenger: &mut Passenger,
         amount: u64,
         ctx: &mut TxContext
-    ) {
-        assert!(tx_context::sender(ctx) == passenger.passenger, ENotPassenger); // Add access control check
-        check_balance(&passenger.balance, amount, EInsufficientBalance);
-        let withdrawn = coin::take(&mut passenger.balance, amount, ctx);
-        transfer::public_transfer(withdrawn, passenger.passenger);
+    ) : Coin<SUI> {
+        coin::take(&mut passenger.balance, amount, ctx)
+
     }
 
     // Withdraws funds from the service's wallet.
@@ -176,10 +180,8 @@ module car_pooling::car_pooling {
         service: &mut ServiceCap,
         amount: u64,
         ctx: &mut TxContext
-    ) {
-        assert!(tx_context::sender(ctx) == service.management, ENotOwner); // Add access control check
-        check_balance(&service.wallet, amount, EInsufficientBalance);
-        let withdrawn = coin::take(&mut service.wallet, amount, ctx);
-        transfer::public_transfer(withdrawn, service.management);
+    ) : Coin<SUI> {
+       coin::take(&mut service.wallet, amount, ctx)
+       
     }
 }
